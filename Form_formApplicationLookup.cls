@@ -56,7 +56,9 @@ Private Sub btnOpenChecklist_Click()
     Dim selectedFolder As String
     Dim selectedFile   As String
     Dim targetWorkbook  As Excel.Workbook
-            
+    Dim targetWorksheet As Excel.Worksheet
+    Dim targetWorksheetTitle As String
+                
     Set fDialog = Application.FileDialog(msoFileDialogFilePicker)
     With fDialog
         .AllowMultiSelect = False
@@ -68,6 +70,17 @@ Private Sub btnOpenChecklist_Click()
         selectedFile = .SelectedItems(1)
     End With
     Debug.Print "選取檢核表為 " & selectedFile
+    
+    Set targetWorkbook = Me.Open_ExistingWorkbook_to_Object(selectedFile)
+    Set targetWorksheet = targetWorkbook.Sheets("文件檢核暨完稅證明申請表")
+    targetWorksheetTitle = targetWorksheet.Range("B5")
+    Debug.Print "worksheet title : " & targetWorksheetTitle
+
+'
+' Extract commodity tax rebate details and populate the data to database tables
+'
+    
+    targetWorkbook.Close
         
 ' Set fDialog = Application.FileDialog(msoFileDialogFolderPicker)
 '    With fDialog
@@ -82,6 +95,18 @@ Private Sub btnOpenChecklist_Click()
 StopCode:
     Set fDialog = Nothing
 End Sub
+
+
+'
+' Demonstrates how a function works and an object is returned by this function
+'
+' ToDo :
+'       - check if specified file exists or not
+'
+Function Open_ExistingWorkbook_to_Object(ByVal fileName As String) As Workbook
+    Set Open_ExistingWorkbook_to_Object = Workbooks.Open(fileName)
+End Function
+
 
 Private Sub cmdClearSearchQuiteria_Click()
     textNewVehicleOwnerFilter.Value = ""
