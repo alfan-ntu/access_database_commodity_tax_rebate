@@ -31,6 +31,7 @@ Const Submit_Date_Range                     As String = "G8"
 Const Tax_Rebate_Payee_Range                As String = "H8"
 Const Cause_to_Refund_Range                 As String = "J8"
 Const Import_Date_Range                     As String = "K8"
+Const Arrival_Port_Range                    As String = "L8"
 Const Number_of_Record_Range                As String = "CA1"
 '
 ' Range of new vehicle information
@@ -119,6 +120,7 @@ Private Sub btnOpenChecklist_Click()
     subformAddNewRecord!textTaxRebatePayee.Value = targetWorksheet.Range(Tax_Rebate_Payee_Range)
     subformAddNewRecord!textTaxRebateReason.Value = targetWorksheet.Range(Cause_to_Refund_Range)
     subformAddNewRecord!textArrivalDate.Value = targetWorksheet.Range(Import_Date_Range)
+    subformAddNewRecord!textArrivalPort.Value = targetWorksheet.Range(Arrival_Port_Range)
 '
 ' 舊車資料
 '
@@ -269,11 +271,18 @@ Private Sub cmdSelectFile_Click()
 ' Experiment to check if I can extract data stored in an Excel file
 '
     targetWorksheetTitle = targetWorksheet.Range("B5")
-    Debug.Print "worksheet title : " & targetWorksheetTitle
     
     Set subformControl = Me!formAddNewRecord_Control.Form
     Set subformDetails = subformControl!formAddNewRecord_Details.Form
-        
+'
+' Check if vehicle body ID or Engine exists or not
+' Only populating the data if not existing
+'
+    targetStringToCheck = targetWorksheet.Range(Vehicle_Body_ID_Range)
+    If Me.isEngineIDExisted(targetStringToCheck) = True Then
+        MsgBox ("Duplicated record, Engine ID exists!")
+        GoTo StopCode
+    End If
 '
 ' 退稅申請基本資料
 '
@@ -281,18 +290,25 @@ Private Sub cmdSelectFile_Click()
     subformControl!textAgent.Value = targetWorksheet.Range(Dealer_Range)
     subformControl!textUndertaker.Value = targetWorksheet.Range(Undertaker_Range)
     subformControl!textNewVehicleBrand.Value = targetWorksheet.Range(Brand_Range)
+    
 '
 ' need to checck if Submit Date is of correct date format
 '
+    subformControl!textApplicationDate.ForeColor = RGB(64, 64, 64)
     targetStringToCheck = targetWorksheet.Range(Submit_Date_Range)
     If (IsDate(targetStringToCheck)) Then
         subformControl!textApplicationDate.Value = targetStringToCheck
+    ElseIf (IsDate(Replace(targetStringToCheck, ".", "/"))) Then
+        subformControl!textApplicationDate.Value = Replace(targetStringToCheck, ".", "/")
+        subformControl!listProcessInfo.AddItem "檢核表 " & Me.textChklistFile.Value
+        subformControl!listProcessInfo.AddItem ">>> 申辦日期輸入值為" & targetStringToCheck & _
+            "更正為" & subformControl!textApplicationDate.Value
     Else
         subformControl!textApplicationDate.Value = "1900/1/1"
         lngOriginalForeColor = subformControl!textApplicationDate.BackColor
-        subformControl!textApplicationDate.ForeColor = RGB(255, 0, 0)
         MsgBox "請檢查申辦日期資料格式" & vbCrLf & _
             "原輸入申辦日期 : " & targetStringToCheck, vbOKOnly
+        subformControl!listProcessInfo.AddItem "檢核表 " & Me.textChklistFile.Value
         subformControl!listProcessInfo.AddItem ">>> 申辦日期輸入值為" & targetStringToCheck
     End If
     
@@ -301,17 +317,26 @@ Private Sub cmdSelectFile_Click()
 '
 ' need to check if Import Date is of correct date format
 '
+    subformControl!textArrivalDate.ForeColor = RGB(64, 64, 64)
     targetStringToCheck = targetWorksheet.Range(Import_Date_Range)
     If (IsDate(targetStringToCheck)) Then
         subformControl!textArrivalDate.Value = targetStringToCheck
+    ElseIf (IsDate(Replace(targetStringToCheck, ".", "/"))) Then
+        targetStringToCheck = Replace(targetStringToCheck, ".", "/")
+        subformControl!textArrivalDate.Value = targetStringToCheck
+        subformControl!listProcessInfo.AddItem "檢核表 " & Me.textChklistFile.Value
+        subformControl!listProcessInfo.AddItem ">>> 到港日期輸入值為" & targetStringToCheck & _
+            "更正為" & subformControl!textApplicationDate.Value
     Else
         subformControl!textArrivalDate.Value = "1900/1/1"
         lngOriginalForeColor = subformControl!textArrivalDate.ForeColor
         subformControl!textArrivalDate.ForeColor = RGB(255, 0, 0)
         MsgBox "請檢查到港日期資料格式" & vbCrLf & _
             "原輸入到港日期 : " & targetStringToCheck, vbOKOnly
+        subformControl!listProcessInfo.AddItem "檢核表 " & Me.textChklistFile.Value
         subformControl!listProcessInfo.AddItem ">>> 到港日期輸入值為" & targetStringToCheck
     End If
+    subformControl!textArrivalPort.Value = targetWorksheet.Range(Arrival_Port_Range)
         
     nextControlID = Next_Control_ID()
     subformControl!textControlID.Value = nextControlID
@@ -379,7 +404,25 @@ Function isValidDate(tString As String) As Boolean
 End Function
 
 '
+' isEngineIDExisted(tString as String) checks if an application for EngineID exists or not
 '
+Function isEngineIDExisted(tString As String) As Boolean
+    Dim sqlString As String
+    
+    sqlString = "Select count(*) from tblControl where EngineID=""" & tString & """;"
+    Debug.Print "isEngineIDExisted exectues the SQL command " & vbNewLine & vbTab & sqlString
+    
+    If CurrentDb.OpenRecordset(sqlString).Fields(0) > 0 Then
+        isEngineIDExisted = True
+        Debug.Print "EngineID " & tString & " exists!"
+    Else
+        isEngineIDExisted = False
+        Debug.Print "EngineID " & tString & " does not exist!"
+    End If
+    
+End Function
+'
+' Subroutine cmdSelectFolder selects the target folder of 檢核表
 '
 Private Sub cmdSelectFolder_Click()
     Dim Directory_String As String
@@ -402,7 +445,8 @@ Private Sub Form_Load()
 '        Me.Get_ImportFolderSetting()
     Me.tabControlMain.Pages(2).Controls!textChkListFolder.Value = _
         Me.Get_ImportFolderSetting()
-        
+    Me!formAddNewRecord_Control.Form!listProcessInfo.RowSource = ""
+            
     Debug.Print "Form_Load of formApplicationLookup is called"
 End Sub
 
